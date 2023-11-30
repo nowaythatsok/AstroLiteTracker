@@ -96,14 +96,20 @@ function init() {
     });
     document.getElementById("saveSettings").addEventListener("click", function() {
         if (websocket.readyState == 1){
-            let message = JSON.stringify({
-            startupTone: document.getElementById("startupTone").checked,
-            holdOn: document.getElementById("holdOn").checked,
-            sleepOn: document.getElementById("sleepOn").checked,
-            sleepLength: document.getElementById("sleepLength").value,
-            nFullSteps: document.getElementById("nFullSteps").checked,
-            type: "settings"
-            })
+            let response = {
+                    startupTone: document.getElementById("startupTone").checked,
+                    holdOn: document.getElementById("holdOn").checked,
+                    sleepOn: document.getElementById("sleepOn").checked,
+                    sleepLength: document.getElementById("sleepLength").value,
+                    nFullSteps: document.getElementById("nFullSteps").checked,
+                    type: "settings"
+            }
+            if (document.getElementById("ssidWifi").value != "" && document.getElementById("pwdWifi").value != ""){
+                response.ssidWifi = document.getElementById("ssidWifi").value;
+                response.pwdWifi  = document.getElementById("pwdWifi").value;
+            }
+
+            let message = JSON.stringify(response)
             doSend(message);
             console.log("saveSettings callback");
         }
@@ -151,13 +157,14 @@ function init() {
     document.getElementById("stepCounterNIncr").value = 100000;
     
     // Connect to WebSocket server
-    wsConnect(url);
+    wsConnect();
 }
 
-function wsConnect(url){
+function wsConnect(){
     console.log("Connecting to websocket");
-    // var gateway = `ws://${window.location.hostname}:1337/`;
-    var gateway = `ws://${window.location.hostname}/ws`;
+    let addr = window.location.hostname || "astrolite.local";
+    let gateway = `ws://${addr}/ws`;
+    console.log("gateway: " + gateway);
     websocket = new WebSocket(gateway);
 
     websocket.onopen    = function(evt) { onOpen(evt) };
@@ -181,7 +188,7 @@ function onOpen(evt) {
 function onClose(evt) {
     console.log("Disconnected");
     document.getElementById("trackerState").innerHTML = "Disconnected";
-    setTimeout(function() { wsConnect(url) }, 1000);
+    setTimeout(function() { wsConnect() }, 1000);
 }
 
 // Called when a WebSocket error occurs
@@ -209,6 +216,7 @@ function onMessage(evt) {
             document.getElementById("sleepOn").checked        = evt.data.sleepOn
             document.getElementById("sleepLength").value      = evt.data.sleepLength
             document.getElementById("nFullSteps").checked     = evt.data.nFullSteps
+            document.getElementById("ssidWifi").value         = evt.data.ssidWifi || ""
 
             document.getElementById("trackerState").innerHTML = evt.data.trackerState
             if (evt.data.trackerState=="ON"){

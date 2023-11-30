@@ -6,7 +6,7 @@
 #include <AsyncTCP.h>
 #include <AccelStepper.h>
 
-#include <read_file.h>
+#include <fileIO.h>
 #include <wifi_setup.h>
 #include <webserver_callbacks.h>
 
@@ -23,11 +23,10 @@ unsigned long cleanupClientsTime = 0;
 
 float stepsPerFullRotation = 200 * 4 * 4 * 120;
 /*
-todo:
+TODO:
 startup sound
 tracking with sleeps
 hold on/off -- with ~4 steps sec this is meaningless, maybe when tracking with sleep
-change ssid and pwd on web interface
 */
 bool  startupTone = true;
 bool  holdOn = true;
@@ -52,6 +51,9 @@ void sendFullState(){
   doc["nFullSteps"]  = stepsPerFullRotation;
   doc["trackerState"]  = (trackingOnTarget) ? "ON" : "OFF";
   doc["type"]  = "fullStatus";
+
+  String ssid_wifi = readFile(SPIFFS, "/ssid_wifi.txt");
+  if ( ssid_wifi != "" ) doc["ssidWifi"] = ssid_wifi;
 
   String serializedJSON;
   serializeJson(doc, serializedJSON);
@@ -151,6 +153,11 @@ void onWebSocketEvent(
         sleepOn              = doc["sleepOn"];
         sleepLength          = doc["sleepLength"];
         stepsPerFullRotation = doc["nFullSteps"];
+
+        if ( doc.containsKey("ssidWifi") && doc.containsKey("pwdWifi") ){
+          wrieFile(SPIFFS, "/ssid_wifi.txt", doc["ssidWifi"]);
+          wrieFile(SPIFFS, "/pwd_wifi.txt", doc["pwdWifi"]);
+        }
 
         stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
 
