@@ -15,6 +15,7 @@
 #define STEPS 200
 #define MICROSTEPS 16
 #define GEARBOX 4*4
+#define CLEANUPMILLIS 3000
 #define dirPin 12 //2
 #define stepPin 14 //4
 
@@ -42,6 +43,9 @@ float sleepLength = 0;
 bool  trackingOnCurrent = true;
 bool  trackingOnTarget  = true;
 bool  movingOn = false;
+
+long loopCounter1 = 0;
+long loopCounter2 = 0;
 
 
 /***********************************************************
@@ -169,6 +173,7 @@ void onWebSocketEvent(
         }
 
         stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
+        wrieFile(SPIFFS, "/stepsPerFullRotation.txt", String(stepsPerFullRotation));
 
         sendFullState();
 
@@ -193,6 +198,8 @@ void setup() {
   // Start Serial port
   Serial.begin(115200);
   Serial.println("Hi. This is project Astro Lite Tracker.");
+  uint32_t f = getCpuFrequencyMhz();
+  Serial.printf("Freq: %i. This should be 240 MHz or as high as can be.\n", f);
 
   // Make sure we can read the file system
   if( !SPIFFS.begin()){
@@ -208,6 +215,7 @@ void setup() {
   stepper.setMaxSpeed( STEPS * MICROSTEPS * GEARBOX * 2 );
   stepper.setAcceleration( STEPS * MICROSTEPS * GEARBOX );
   stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
+  stepper.setSpeed( 10000 );
   // speed	The desired constant speed in steps per second. 
   // Positive is clockwise. Speeds of more than 1000 steps per second are unreliable. 
   // Very slow speeds may be set (eg 0.00027777 for once per hour, approximately. 
@@ -229,19 +237,34 @@ void setup() {
 }
 
 void loop() {
-  if ((unsigned long)(millis() - cleanupClientsTime) >= 3000){ // handles rollover fine
-    cleanupClientsTime = millis();
+  loopCounter1 ++;
+
+  if ((unsigned long)(millis() - cleanupClientsTime) >= CLEANUPMILLIS){ // handles rollover fine
+    
     webSocket.cleanupClients();
+    Serial.printf("Loop frequency: %i kHz and %i kHz\n", loopCounter1/CLEANUPMILLIS, loopCounter2/CLEANUPMILLIS);// 3 seconds!
+
+    loopCounter1 = 0;
+    loopCounter2 = 0;
+    cleanupClientsTime = millis();
   }  
 
-  if (trackingOnCurrent){
-    stepper.runSpeed();
-    if ( ! trackingOnTarget && stepper.speed() == 0.0) trackingOnCurrent = false;
-  } 
-  else if (movingOn){
-    stepper.run();
-    movingOn = abs(stepper.distanceToGo())>0; // stop when at target
-  }
-  else if ( trackingOnTarget ) trackingOnCurrent = true;    
+    loopCounter2 ++;
 
-}
+    if (trackingOnCurrent){
+      stepper.runSpeed();
+      if ( ! trackingOnTarget && stepper.speed() == 0.0) trackingOnCurrent = false;
+    } 
+    else if (movingOn){
+      for (int i = 0; i<MICROSTEPS; i++) stepper.run();
+      /*
+      RTOS is very greedy and runs other threads on CORE1 before and after the loop. 
+      This can make it difficult to approach the max available speed. 
+      By default @240 MHz an almost empty loop runs only at 100 kHz.
+      By implementing an inner loop we can get more executions per second at 
+      a minor loss of frequency for the maintenance tasks. 
+      */
+      movingOn = abs(stepper.distanceToGo())>0; // stop when at target
+    }
+    else if ( trackingOnTarget ) trackingOnCurrent = true;   
+  } 
