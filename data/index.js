@@ -101,7 +101,7 @@ function init() {
                     holdOn: document.getElementById("holdOn").checked,
                     sleepOn: document.getElementById("sleepOn").checked,
                     sleepLength: document.getElementById("sleepLength").value,
-                    nFullSteps: document.getElementById("nFullSteps").checked,
+                    nFullSteps: document.getElementById("nFullSteps").value,
                     type: "settings"
             }
             if (document.getElementById("ssidWifi").value != "" && document.getElementById("pwdWifi").value != ""){
@@ -177,7 +177,7 @@ function wsConnect(){
 function onOpen(evt) {
     console.log("Connected");
     document.getElementById("trackerState").innerHTML = "Connected";
-    doSend(JSON.stringify({ type: "fullState" }));
+    // now this comes from the server automatically doSend(JSON.stringify({ type: "fullState" }));
 
     for (let i = 0; i < buttons.length; i++) {
         if (buttons[i] == "trackerOn" || buttons[i] == "trackerOff") continue;
@@ -206,24 +206,26 @@ function doSend(message) {
 function onMessage(evt) {
 
     // Print out our received message
-    console.log("Received: " + evt.data.type + " message");
+    console.log("Received message: " + evt.data );
+    let data = JSON.parse(evt.data);
     
     // Update DOM
-    switch(evt.data.type) {
+    switch(data.type) {
         case "fullState":
-            document.getElementById("startupTone").checked    = evt.data.startupTone
-            document.getElementById("holdOn").checked         = evt.data.holdOn
-            document.getElementById("sleepOn").checked        = evt.data.sleepOn
-            document.getElementById("sleepLength").value      = evt.data.sleepLength
-            document.getElementById("nFullSteps").checked     = evt.data.nFullSteps
-            document.getElementById("ssidWifi").value         = evt.data.ssidWifi || ""
+            console.log("Received fullState")
+            document.getElementById("startupTone").checked    = data.startupTone
+            document.getElementById("holdOn").checked         = data.holdOn
+            document.getElementById("sleepOn").checked        = data.sleepOn
+            document.getElementById("sleepLength").value      = data.sleepLength
+            document.getElementById("nFullSteps").value       = data.nFullSteps
+            document.getElementById("ssidWifi").value         = data.ssidWifi || ""
 
-            document.getElementById("trackerState").innerHTML = evt.data.trackerState
-            if (evt.data.trackerState=="ON"){
+            document.getElementById("trackerState").innerHTML = data.trackerState
+            if (data.trackerState=="ON"){
                 document.getElementById("trackerOn").disabled = true;
                 document.getElementById("trackerOff").disabled = false;
             }
-            else if (evt.data.trackerState=="OFF"){
+            else if (data.trackerState=="OFF"){
                 document.getElementById("trackerOff").disabled = true;
                 document.getElementById("trackerOn").disabled = false;
             }
@@ -234,12 +236,13 @@ function onMessage(evt) {
                     
             break;
         case "trackerState":
-            document.getElementById("trackerState").innerHTML = evt.data.trackerState
-            if (evt.data.trackerState=="ON"){
+            console.log("Received trackerState")
+            document.getElementById("trackerState").innerHTML = data.trackerState
+            if (data.trackerState=="ON"){
                 document.getElementById("trackerOn").disabled = true;
                 document.getElementById("trackerOff").disabled = false;
             }
-            else if (evt.data.trackerState=="OFF"){
+            else if (data.trackerState=="OFF"){
                 document.getElementById("trackerOff").disabled = true;
                 document.getElementById("trackerOn").disabled = false;
             }

@@ -12,8 +12,11 @@
 
 
 // Constants
-#define dirPin 2
-#define stepPin 3
+#define STEPS 200
+#define MICROSTEPS 16
+#define GEARBOX 4*4
+#define dirPin 12 //2
+#define stepPin 14 //4
 
 // Globals
 AsyncWebServer server(80);
@@ -21,12 +24,15 @@ AsyncWebSocket webSocket("/ws");
 AccelStepper stepper = AccelStepper( AccelStepper::DRIVER, stepPin, dirPin);
 unsigned long cleanupClientsTime = 0;
 
-float stepsPerFullRotation = 200 * 4 * 4 * 120;
+float stepsPerFullRotation = STEPS * MICROSTEPS * GEARBOX * 120;
 /*
 TODO:
 startup sound
 tracking with sleeps
 hold on/off -- with ~4 steps sec this is meaningless, maybe when tracking with sleep
+when not working, maybe the motor power should be disconnected
+disableOutputs(), enableOutputs() IF the enable pin is defined
+setEnablePin (uint8_t enablePin=0xff)
 */
 bool  startupTone = true;
 bool  holdOn = true;
@@ -43,14 +49,14 @@ bool  movingOn = false;
  */
 
 void sendFullState(){
-  StaticJsonDocument<400> doc;
+  StaticJsonDocument<500> doc;
   doc["startupTone"] = startupTone;
   doc["holdOn"]      = holdOn;
   doc["sleepOn"]     = sleepOn;
   doc["sleepLength"] = sleepLength;
   doc["nFullSteps"]  = stepsPerFullRotation;
   doc["trackerState"]  = (trackingOnTarget) ? "ON" : "OFF";
-  doc["type"]  = "fullStatus";
+  doc["type"]  = "fullState";
 
   String ssid_wifi = readFile(SPIFFS, "/ssid_wifi.txt");
   if ( ssid_wifi != "" ) doc["ssidWifi"] = ssid_wifi;
@@ -89,15 +95,18 @@ void onWebSocketEvent(
       break;
     case WS_EVT_CONNECT:
       Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      Serial.println("Sending a full state");
+      sendFullState();
       break;
     case WS_EVT_DATA:
     {
 
       StaticJsonDocument<1000> doc;
-      deserializeJson(doc, payload);
-      if (doc.containsKey("type")) {
-        Serial.printf("[%u] Sent text: %s\n", client->id(), payload);
-        Serial.printf("Message does not contain type!");
+      deserializeJson(doc, payload, length);
+      if (! doc.containsKey("type")) {
+        Serial.printf("[%u] Sent text: %s\n", client->id(), String(payload, length).c_str() );
+        Serial.printf("Claimed length: %u\n", length);
+        Serial.println("Message does not contain type!");
         break;
       }
       
@@ -127,7 +136,7 @@ void onWebSocketEvent(
 
         trackingOnCurrent = false;
         // trackingOnTarget remains and resumes after moving if it was on
-        stepper.move( stepsPerFullRotation * doc["value"] / 360.0 );
+        stepper.move( long(stepsPerFullRotation * float(doc["value"]) / 360.0) );
         movingOn = true;
 
       } else if ( strcmp((char *)mytype, "stepSteps") == 0 ) {
@@ -135,7 +144,7 @@ void onWebSocketEvent(
 
         trackingOnCurrent = false;
         trackingOnTarget  = false;
-        stepper.move( doc["value"] );
+        stepper.move( long(doc["value"]) );
         movingOn = true;
 
       } else if ( strcmp((char *)mytype, "trackerSTOP") == 0 ) {
@@ -196,8 +205,8 @@ void setup() {
 
   String temp = readFile(SPIFFS, "/stepsPerFullRotation.txt");
   if ( temp != "" ) stepsPerFullRotation = temp.toFloat();
-  stepper.setMaxSpeed(2000);
-  stepper.setAcceleration(100.0);
+  stepper.setMaxSpeed( STEPS * MICROSTEPS * GEARBOX * 2 );
+  stepper.setAcceleration( STEPS * MICROSTEPS * GEARBOX );
   stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
   // speed	The desired constant speed in steps per second. 
   // Positive is clockwise. Speeds of more than 1000 steps per second are unreliable. 
