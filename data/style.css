@@ -39,7 +39,7 @@ html {
   }
 
   .content { 
-    padding: 50px;
+    padding: 10px;
   }
   .card-grid {
     max-width: 900px;
@@ -290,3 +290,5 @@ input:checked + .slider:before {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+

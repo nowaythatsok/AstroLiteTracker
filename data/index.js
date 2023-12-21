@@ -4,8 +4,10 @@ var buttons=[
             "reloadSettings", "saveSettings", 
             "stepCounterReset", "stepCounterSTOP", "stepCounterStep"
         ];
+var rbuttons = ["siderealTr", "lunarTr", "solarTr"];
 var websocket;
 var stepCounterCount=0;
+var trackingMode="sidereal";
 
 // This is called when the page finishes loading
 function init() {
@@ -19,18 +21,48 @@ function init() {
             console.error(buttons[i]);
         }
         
-    }           
+    }   
+    for (let i = 0; i < rbuttons.length; i++) {
+        try {
+            document.getElementById(rbuttons[i]).disabled = true;
+        } catch (error) {
+            console.error(error);
+            console.error(rbuttons[i]);
+        }
+        
+    }            
 
     // set callbacks for controls
 
     ////////////////////////////////////////////////////////////
+    function sendTrackerOption(name){
+        if (websocket.readyState == 1){
+            if (document.getElementById(name).checked){
+                trackingMode = name.substring(0, str.length-2);
+                doSend(JSON.stringify({type:"trackerOn", trackingMode:trackingMode }));
+                console.log("trackerOn callback "+trackingMode);
+            }
+        }
+        else{
+            console.error("tracking option selaction not executed, connection is "+str(websocket.readyState));
+        }
+    }
+    for (let i = 0; i < rbuttons.length; i++) document.getElementById(rbuttons[i]).addEventListener("click", 
+        // https://stackoverflow.com/questions/30354136/function-call-with-parameters-to-addeventlistener-inside-a-loop
+        (function(x){
+            return function(){
+                sendTrackerOption(x);
+            }
+        })(rbuttons[i])
+    );
+        
 
     document.getElementById("trackerOn").addEventListener("click", function() {
         if (websocket.readyState == 1){
             document.getElementById("trackerOn").disabled = true;
             document.getElementById("trackerOff").disabled = false;
             document.getElementById("trackerState").innerHTML="ON";
-            doSend(JSON.stringify({type:"trackerOn"}));
+            doSend(JSON.stringify({type:"trackerOn", trackingMode:trackingMode}));
             console.log("trackerOn callback");
         }
         else{
@@ -63,9 +95,14 @@ function init() {
 
             document.getElementById("trackerOff").disabled = true;
             document.getElementById("trackerOn").disabled = true;
+
+            document.getElementById("siderealTr").disabled = true;
+            document.getElementById("lunarTr").disabled = true;
+            document.getElementById("solarTr").disabled = true;
+
             document.getElementById("trackerState").innerHTML="Busy";
 
-            console.log(degrees[i] + " callback, pos: " + str(positive));
+            console.log(degrees[i] + " callback, pos: " + positive.toString());
             }
             else{
             console.error("manual shift not executed, connection is "+str(websocket.readyState));
@@ -102,6 +139,7 @@ function init() {
                     sleepOn: document.getElementById("sleepOn").checked,
                     sleepLength: document.getElementById("sleepLength").value,
                     nFullSteps: document.getElementById("nFullSteps").value,
+                    trackingMode:trackingMode,
                     type: "settings"
             }
             if (document.getElementById("ssidWifi").value != "" && document.getElementById("pwdWifi").value != ""){
@@ -139,6 +177,11 @@ function init() {
             // turn off normal tracking
             document.getElementById("trackerOff").disabled = true;
             document.getElementById("trackerOn").disabled = true;
+
+            document.getElementById("siderealTr").disabled = true;
+            document.getElementById("lunarTr").disabled = true;
+            document.getElementById("solarTr").disabled = true;
+
             document.getElementById("trackerState").innerHTML="Busy";
             doSend(JSON.stringify({type:"trackerOff"}));
 
@@ -219,36 +262,41 @@ function onMessage(evt) {
             document.getElementById("sleepLength").value      = data.sleepLength
             document.getElementById("nFullSteps").value       = data.nFullSteps
             document.getElementById("ssidWifi").value         = data.ssidWifi || ""
+            document.getElementById("pwdWifi").value          = data.pwdWifi || ""
 
-            document.getElementById("trackerState").innerHTML = data.trackerState
-            if (data.trackerState=="ON"){
-                document.getElementById("trackerOn").disabled = true;
-                document.getElementById("trackerOff").disabled = false;
-            }
-            else if (data.trackerState=="OFF"){
-                document.getElementById("trackerOff").disabled = true;
-                document.getElementById("trackerOn").disabled = false;
-            }
-            else{
-                document.getElementById("trackerOff").disabled = true;
-                document.getElementById("trackerOn").disabled = true;
-            }
-                    
-            break;
+            // no break!!
         case "trackerState":
-            console.log("Received trackerState")
-            document.getElementById("trackerState").innerHTML = data.trackerState
+            if (data.type == "trackerState") console.log("Received trackerState");
+
+            document.getElementById("siderealTr").checked     = (data.trackingMode == "sidereal")
+            document.getElementById("lunarTr").checked        = (data.trackingMode == "lunar")
+            document.getElementById("solarTr").checked        = (data.trackingMode == "solar")
+            trackingMode = data.trackingMode;
+
+            document.getElementById("trackerState").innerHTML = data.trackerState;
             if (data.trackerState=="ON"){
                 document.getElementById("trackerOn").disabled = true;
                 document.getElementById("trackerOff").disabled = false;
+
+                document.getElementById("siderealTr").disabled = false;
+                document.getElementById("lunarTr").disabled = false;
+                document.getElementById("solarTr").disabled = false;
             }
             else if (data.trackerState=="OFF"){
                 document.getElementById("trackerOff").disabled = true;
                 document.getElementById("trackerOn").disabled = false;
+
+                document.getElementById("siderealTr").disabled = false;
+                document.getElementById("lunarTr").disabled = false;
+                document.getElementById("solarTr").disabled = false;
             }
             else{
                 document.getElementById("trackerOff").disabled = true;
                 document.getElementById("trackerOn").disabled = true;
+
+                document.getElementById("siderealTr").disabled = true;
+                document.getElementById("lunarTr").disabled = true;
+                document.getElementById("solarTr").disabled = true;
             }
             break;
         default:

@@ -6,6 +6,7 @@
   <meta name="viewport" charset="utf-8" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="favicon.ico">
   <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" type="text/css" href="radio.css">
   <script type="text/javascript" src="index.js"></script>
 </head>
 
@@ -23,6 +24,33 @@
         <p>
           Tracker state: <strong id="trackerState">Disconnected</strong></p>
         <p>
+          
+          <div class="radiocontainer">
+            <ul>
+              <li>
+                <input type="radio" id="siderealTr" name="selector">
+                <label for="siderealTr">Sidereal tracking</label>
+                
+                <div class="check"></div>
+              </li>
+              
+              <li>
+                <input type="radio" id="lunarTr" name="selector">
+                <label for="lunarTr">Lunar tracking</label>
+                
+                <div class="check"><div class="inside"></div></div>
+              </li>
+              
+              <li>
+                <input type="radio" id="solarTr" name="selector">
+                <label for="solarTr">Solar tracking</label>
+                
+                <div class="check"><div class="inside"></div></div>
+              </li>
+            </ul>
+          </div>
+    
+        
          
             <button id="trackerOn" class="button button-red" disabled>On</button>
             <button id="trackerOff"class="button button-green" >Off</button>

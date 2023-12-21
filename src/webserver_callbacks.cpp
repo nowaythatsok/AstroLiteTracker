@@ -17,6 +17,13 @@ void onCSSRequest(AsyncWebServerRequest *request) {
   request->send(SPIFFS, "/style.css", "text/css");
 }
 
+void onCSS2Request(AsyncWebServerRequest *request) {
+  IPAddress remote_ip = request->client()->remoteIP();
+  Serial.println("[" + remote_ip.toString() +
+                  "] HTTP GET request of " + request->url());
+  request->send(SPIFFS, "/radio.css", "text/css");
+}
+
 void onJSRequest(AsyncWebServerRequest *request) {
   IPAddress remote_ip = request->client()->remoteIP();
   Serial.println("[" + remote_ip.toString() +

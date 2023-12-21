@@ -19,6 +19,10 @@
 #define dirPin 12 //2
 #define stepPin 14 //4
 
+#define SIDERALHOURS 23.9344696
+#define SOLARHOURS 24 //synodic day 
+#define LUNARHOURS 24*(1 + 1/27.3)
+
 // Globals
 AsyncWebServer server(80);
 AsyncWebSocket webSocket("/ws");
@@ -34,6 +38,9 @@ hold on/off -- with ~4 steps sec this is meaningless, maybe when tracking with s
 when not working, maybe the motor power should be disconnected
 disableOutputs(), enableOutputs() IF the enable pin is defined
 setEnablePin (uint8_t enablePin=0xff)
+microstep pins?
+safety timer?
+safety angle limits?
 */
 bool  startupTone = true;
 bool  holdOn = true;
@@ -47,10 +54,20 @@ bool  movingOn = false;
 long loopCounter1 = 0;
 long loopCounter2 = 0;
 
+char* trackingMode = "sidereal";
+
 
 /***********************************************************
  * Functions
  */
+
+
+void setSpeed(){
+  if      (strcmp(trackingMode,  "sidereal") == 0) stepper.setSpeed( stepsPerFullRotation / (SIDERALHOURS*60*60) );
+  else if (strcmp(trackingMode,  "lunar") == 0)    stepper.setSpeed( stepsPerFullRotation / (LUNARHOURS*60*60) );
+  else if (strcmp(trackingMode,  "solar") == 0)    stepper.setSpeed( stepsPerFullRotation / (SOLARHOURS*60*60) );
+  else Serial.printf("Unrecognized trackingMode: %s", trackingMode);
+}
 
 void sendFullState(){
   StaticJsonDocument<500> doc;
@@ -60,6 +77,7 @@ void sendFullState(){
   doc["sleepLength"] = sleepLength;
   doc["nFullSteps"]  = stepsPerFullRotation;
   doc["trackerState"]  = (trackingOnTarget) ? "ON" : "OFF";
+  doc["trackingMode"]  = trackingMode;
   doc["type"]  = "fullState";
 
   String ssid_wifi = readFile(SPIFFS, "/ssid_wifi.txt");
@@ -74,6 +92,7 @@ void sendFullState(){
 void sendTrackerState(){
   StaticJsonDocument<200> doc;
   doc["trackerState"]  = (trackingOnTarget) ? "ON" : "OFF";
+  doc["trackingMode"]  = trackingMode;
   doc["type"]  = "trackerState";
 
   String serializedJSON;
@@ -120,7 +139,8 @@ void onWebSocketEvent(
       if ( strcmp((char *)mytype,        "trackerOn") == 0 ) {
         Serial.printf("trackerOn");
 
-        stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
+        trackingMode  = (char *)doc["trackingMode"];
+        setSpeed();
         trackingOnCurrent = true;
         trackingOnTarget  = true;
         sendTrackerState();
@@ -166,13 +186,14 @@ void onWebSocketEvent(
         sleepOn              = doc["sleepOn"];
         sleepLength          = doc["sleepLength"];
         stepsPerFullRotation = doc["nFullSteps"];
+        trackingMode  = (char *)doc["trackingMode"];
+        setSpeed();
 
         if ( doc.containsKey("ssidWifi") && doc.containsKey("pwdWifi") ){
           wrieFile(SPIFFS, "/ssid_wifi.txt", doc["ssidWifi"]);
           wrieFile(SPIFFS, "/pwd_wifi.txt", doc["pwdWifi"]);
         }
 
-        stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
         wrieFile(SPIFFS, "/stepsPerFullRotation.txt", String(stepsPerFullRotation));
 
         sendFullState();
@@ -214,7 +235,9 @@ void setup() {
   if ( temp != "" ) stepsPerFullRotation = temp.toFloat();
   stepper.setMaxSpeed( STEPS * MICROSTEPS * GEARBOX * 2 );
   stepper.setAcceleration( STEPS * MICROSTEPS * GEARBOX );
-  stepper.setSpeed( stepsPerFullRotation / (24*60*60) );
+  setSpeed();
+
+  // for testing:
   stepper.setSpeed( 10000 );
   // speed	The desired constant speed in steps per second. 
   // Positive is clockwise. Speeds of more than 1000 steps per second are unreliable. 
@@ -225,6 +248,7 @@ void setup() {
   // On HTTP request 
   server.on("/", HTTP_GET, onIndexRequest);
   server.on("/style.css", HTTP_GET, onCSSRequest);
+  server.on("/radio.css", HTTP_GET, onCSS2Request);
   server.on("/index.js", HTTP_GET, onJSRequest);
   server.on("/favicon.ico", HTTP_GET, onFavRequest);
   server.onNotFound(onPageNotFound);
@@ -249,22 +273,22 @@ void loop() {
     cleanupClientsTime = millis();
   }  
 
-    loopCounter2 ++;
+  loopCounter2 ++;
 
-    if (trackingOnCurrent){
-      stepper.runSpeed();
-      if ( ! trackingOnTarget && stepper.speed() == 0.0) trackingOnCurrent = false;
-    } 
-    else if (movingOn){
-      for (int i = 0; i<MICROSTEPS; i++) stepper.run();
-      /*
-      RTOS is very greedy and runs other threads on CORE1 before and after the loop. 
-      This can make it difficult to approach the max available speed. 
-      By default @240 MHz an almost empty loop runs only at 100 kHz.
-      By implementing an inner loop we can get more executions per second at 
-      a minor loss of frequency for the maintenance tasks. 
-      */
-      movingOn = abs(stepper.distanceToGo())>0; // stop when at target
-    }
-    else if ( trackingOnTarget ) trackingOnCurrent = true;   
+  if (trackingOnCurrent){
+    stepper.runSpeed();
+    if ( ! trackingOnTarget && stepper.speed() == 0.0) trackingOnCurrent = false;
   } 
+  else if (movingOn){
+    for (int i = 0; i<MICROSTEPS; i++) stepper.run();
+    /*
+    RTOS is very greedy and runs other threads on CORE1 before and after the loop. 
+    This can make it difficult to approach the max available speed. 
+    By default @240 MHz an almost empty loop runs only at 100 kHz.
+    By implementing an inner loop we can get more executions per second at 
+    a minor loss of frequency for the maintenance tasks. 
+    */
+    movingOn = abs(stepper.distanceToGo())>0; // stop when at target
+  }
+  else if ( trackingOnTarget ) trackingOnCurrent = true;   
+} 
