@@ -15,7 +15,7 @@
 #define STEPS 200
 #define MICROSTEPS 16
 #define GEARBOX 4*4
-#define CLEANUPMILLIS 3000
+#define CLEANUPMILLIS 10000
 #define dirPin 12 //2
 #define stepPin 14 //4
 
@@ -46,6 +46,7 @@ bool  startupTone = true;
 bool  holdOn = true;
 bool  sleepOn = false;
 float sleepLength = 0;
+char* trackingMode = "sidereal";
 
 bool  trackingOnCurrent = true;
 bool  trackingOnTarget  = true;
@@ -54,7 +55,6 @@ bool  movingOn = false;
 long loopCounter1 = 0;
 long loopCounter2 = 0;
 
-char* trackingMode = "sidereal";
 
 
 /***********************************************************
@@ -266,7 +266,7 @@ void loop() {
   if ((unsigned long)(millis() - cleanupClientsTime) >= CLEANUPMILLIS){ // handles rollover fine
     
     webSocket.cleanupClients();
-    Serial.printf("Loop frequency: %i kHz and %i kHz\n", loopCounter1/CLEANUPMILLIS, loopCounter2/CLEANUPMILLIS);// 3 seconds!
+    Serial.printf("Loop frequency: %i kHz and %i kHz\n", loopCounter1/CLEANUPMILLIS, loopCounter2/CLEANUPMILLIS);
 
     loopCounter1 = 0;
     loopCounter2 = 0;
